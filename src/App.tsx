@@ -1,5 +1,7 @@
+import { useState } from "react";
 import create from "zustand";
 import { immer } from "zustand/middleware/immer";
+import { SessionStartupType, trackAppInitStage } from "./AppInit";
 
 interface Todo {
   id: string;
@@ -50,8 +52,27 @@ export default function App() {
   const todos = useTodoStore((state) => state.todos);
   const toggleTodo = useTodoStore((state) => state.toggleTodo);
 
+  const [isFirstAppLaunch, setIsFirstAppLaunch] = useState(true);
+  const [startType, setStartType] = useState(SessionStartupType.COLD_START);
+
+  const { currentStage, sessionStartupType, vendorCallbackMap, isFirsttimeAppLaunch } = trackAppInitStage({
+    isFirstAppLaunch,
+    startType,
+  });
+
   return (
     <div className="App">
+      <h1>App Init Status</h1>
+
+      <button onClick={() => setIsFirstAppLaunch(false)}>Set Is First App Launch to False</button>
+      <button onClick={() => setStartType(SessionStartupType.WARM_START)}>Set Start Type to Warm Start</button>
+
+      <p>Current Stage: {currentStage}</p>
+      <p>Session Startup Type: {sessionStartupType}</p>
+      <p>Vendor Callback Map: {JSON.stringify(vendorCallbackMap)}</p>
+      <p>Is First App Launch: {isFirstAppLaunch}</p>
+      <p>Is Firsttime App Launch: {isFirsttimeAppLaunch}</p>
+
       <ul>
         {Object.values(todos).map((todo) => (
           <li key={todo.id}>
