@@ -1,13 +1,13 @@
 import { useAppInitStore } from './store'
 
 export const useAppInitStage = () => {
-  const currentStage = useAppInitStore.use.currentStage()
+  const currentStage = useAppInitStore.use.current()
 
-  const addVendorStageCallbacks = useAppInitStore(state => state.addVendorStageCallbacks)
+  const registerVendorActions = useAppInitStore(state => state.registerVendorActionsMap)
 
   return {
     currentStage,
-    addVendorStageCallbacks,
+    registerVendorActions,
   }
 }
 

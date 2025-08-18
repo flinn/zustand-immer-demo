@@ -5,57 +5,24 @@ import { createSelectors } from '../Utilities/create-selectors'
 
 export const useExperimentFlagsStoreBase = create<ExperimentFlagState & ExperimentFlagActions>()(
   immer((set, get) => ({
-    realtimeUpdatedAt: null,
-    sessionSyncedUpdatedAt: null,
-    appInitUpdatedAt: null,
+    isAppInitComplete: false,
+    isSessionSyncComplete: false,
     cache: {},
     resetFlagCache: () => {
       set((state) => {
         state.cache = {}
-        state.realtimeUpdatedAt = null
-        state.sessionSyncedUpdatedAt = null
-        state.appInitUpdatedAt = null
       })
     },
     addFlagToCache: (flag: ExperimentFlag) => {
       set((state) => {
         state.cache[flag.name] = flag
-        // Update timestamps based on flag type
-        if (flag.isRealtime) {
-          state.realtimeUpdatedAt = Date.now()
-        }
-        if (flag.isSessionSynced) {
-          state.sessionSyncedUpdatedAt = Date.now()
-        }
-        if (flag.isAppInit) {
-          state.appInitUpdatedAt = Date.now()
-        }
       })
     },
     addFlagsToCache: (flags: ExperimentFlag[]) => {
       set((state) => {
-        const now = Date.now()
-        let hasRealtime = false
-        let hasSessionSynced = false
-        let hasAppInit = false
-
         flags.forEach((flag) => {
-          state.cache[flag.name] = flag
-          if (flag.isRealtime) hasRealtime = true
-          if (flag.isSessionSynced) hasSessionSynced = true
-          if (flag.isAppInit) hasAppInit = true
+          state.cache[flag.name] = flag          
         })
-
-        // Update timestamps based on flag types
-        if (hasRealtime) {
-          state.realtimeUpdatedAt = now
-        }
-        if (hasSessionSynced) {
-          state.sessionSyncedUpdatedAt = now
-        }
-        if (hasAppInit) {
-          state.appInitUpdatedAt = now
-        }
       })
     },
     removeFlagFromCache: (flag: ExperimentFlag) => {
@@ -84,9 +51,8 @@ export const useExperimentFlagsStore = createSelectors(useExperimentFlagsStoreBa
 
 export const useExperimentFlags = () => {
   const cache = useExperimentFlagsStore.use.cache()
-  const realtimeUpdatedAt = useExperimentFlagsStore.use.realtimeUpdatedAt()
-  const sessionSyncedUpdatedAt = useExperimentFlagsStore.use.sessionSyncedUpdatedAt()
-  const appInitUpdatedAt = useExperimentFlagsStore.use.appInitUpdatedAt()
+  const isSessionSyncComplete = useExperimentFlagsStore.use.isSessionSyncComplete()
+  const isAppInitComplete = useExperimentFlagsStore.use.isAppInitComplete()
 
   const addFlagToCache = useExperimentFlagsStore(state => state.addFlagToCache)
   const addFlagsToCache = useExperimentFlagsStore(state => state.addFlagsToCache)
@@ -115,9 +81,8 @@ export const useExperimentFlags = () => {
 
   return {
     cache,
-    realtimeUpdatedAt,
-    sessionSyncedUpdatedAt,
-    appInitUpdatedAt,
+    isSessionSyncComplete,
+    isAppInitComplete,
     addFlagToCache,
     addFlagsToCache,
     removeFlagFromCache,

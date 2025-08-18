@@ -38,10 +38,9 @@ export const useSessionContexts = (): AppSessionContexts => {
       })
     }
     else {
-      // We don't have what we need to set the user context
       setUserContext(null)
     }
-  }, [user, anonymousId, externalUserId])
+  }, [user, anonymousId, externalUserId, appSessionId, userLastUpdatedAt])
 
   useEffect(() => {
     if (externalDeviceSessionId) {
@@ -55,10 +54,9 @@ export const useSessionContexts = (): AppSessionContexts => {
       })
     }
     else {
-      // We don't have what we need to set the device context
       setDeviceContext(null)
     }
-  }, [device, externalDeviceSessionId])
+  }, [device, externalDeviceSessionId, appSessionId, deviceLastUpdatedAt])
 
   return {
     kind: 'multi',

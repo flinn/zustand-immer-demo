@@ -11,29 +11,21 @@ export const useTrackAppInitStage = ({
   isFirstAppLaunch,
   startType,
 }: TrackAppInitStageProps) => {
-  const isFirsttimeAppLaunch = useAppInitStore.use.isFirsttimeAppLaunch()
-  const currentStage = useAppInitStore.use.currentStage()
-  const sessionStartupType = useAppInitStore.use.sessionStartupType()
-  const vendorCallbackMap = useAppInitStore.use.vendorCallbackMap()
+  
+  const currentStage = useAppInitStore.use.current()
 
   const startAppInit = useAppInitStore(state => state.startAppInit)
+  const setStartType = useAppInitStore(state => state.setSessionStartupType)
+  const setIsFirstAppLaunch = useAppInitStore(state => state.setIsFirstAppLaunch)
 
   useEffect(() => {
-    if (currentStage === AppInitStage.APP_CAME_TO_FOREGROUND) {
-      startAppInit(isFirstAppLaunch, startType)
-    }
-  }, [currentStage, isFirstAppLaunch, startType, startAppInit])
-
-  useEffect(() => {
-    if (currentStage === AppInitStage.INITIAL_STARTUP) {
+    if (currentStage === AppInitStage.PROCESS_STARTED) {
       startAppInit(isFirstAppLaunch, startType)
     }
   }, [currentStage, isFirstAppLaunch, startType, startAppInit])
 
   return {
-    currentStage,
-    sessionStartupType,
-    vendorCallbackMap,
-    isFirsttimeAppLaunch,
+    setSessionStartupType: setStartType,
+    setIsFirstAppLaunch: setIsFirstAppLaunch,
   }
 }

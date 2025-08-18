@@ -1,40 +1,52 @@
 import create from 'zustand'
 import { immer } from 'zustand/middleware/immer'
-import { AppInitStage, SessionStartupType } from './types'
+import { AppInitStage, AppInitVendorActions, SessionStartupType, VendorInitActionsMap } from './types'
 import { createSelectors } from '../Utilities/create-selectors'
 
 export interface AppInitState {
-  currentStage: AppInitStage
-  isFirsttimeAppLaunch: boolean | null
-  sessionStartupType: SessionStartupType | null
-  vendorCallbackMap: Record<AppInitStage, Function[]>
+  current: AppInitStage
+  isFirsttimeAppLaunch: boolean
+  sessionStartupType: SessionStartupType
+  vendorActionMaps: Record<AppInitVendorActions, Function[]>
 }
 export type AppInitActions = {
   startAppInit: (isFirstLaunch: boolean, startType: SessionStartupType) => void
-  addVendorStageCallbacks: (vendorCallbacks: Record<AppInitStage, Function>) => void
+  registerVendorActionsMap: (actionsMap: VendorInitActionsMap) => void
+  setSessionStartupType: (startType: SessionStartupType) => void
+  setIsFirstAppLaunch: (isFirstLaunch: boolean) => void
 }
 
 export const useAppInitStoreBase = create<AppInitState & AppInitActions>()(
   immer(set => ({
-    currentStage: AppInitStage.INITIAL_STARTUP,
-    isFirsttimeAppLaunch: null,
-    sessionStartupType: null,
-    vendorCallbackMap: {} as any,
+    current: AppInitStage.PROCESS_STARTED,
+    isFirsttimeAppLaunch: false,
+    sessionStartupType: SessionStartupType.COLD_START,
+    vendorActionMaps: {} as any,
+    setSessionStartupType: (startType: SessionStartupType) => {
+      set((state) => {
+        state.sessionStartupType = startType
+      })
+    },
+    setIsFirstAppLaunch: (isFirstLaunch: boolean) => {
+      set((state) => {
+        state.isFirsttimeAppLaunch = isFirstLaunch
+      })
+    },
     startAppInit: (isFirstLaunch: boolean, startType: SessionStartupType) => {
       set((state) => {
-        state.currentStage = AppInitStage.APP_CAME_TO_FOREGROUND
+        state.current = AppInitStage.SESSION_SPAWNED
         state.isFirsttimeAppLaunch = isFirstLaunch
         state.sessionStartupType = startType
       })
     },
-    addVendorStageCallbacks: (vendorCallbacks: Record<AppInitStage, Function>) => {
+    registerVendorActionsMap: (actionsMap: VendorInitActionsMap) => {
       set((state) => {
-        for (const [stage, cbFunction] of Object.entries(vendorCallbacks)) {
-          if (state.vendorCallbackMap[stage as AppInitStage]) {
-            state.vendorCallbackMap[stage as AppInitStage].push(cbFunction)
+        for (const [action, vendorFn] of Object.entries(actionsMap.actions)) {
+          if (state.vendorActionMaps[action as AppInitVendorActions]) {
+            state.vendorActionMaps[action as AppInitVendorActions].push(vendorFn)
           }
           else {
-            state.vendorCallbackMap[stage as AppInitStage] = [cbFunction]
+            state.vendorActionMaps[action as AppInitVendorActions] = [vendorFn]
           }
         }
       })

@@ -8,15 +8,15 @@ export const useSessionContextIdentity = (): SessionIdentityState => {
   const anonymousId = useSessionContextIdentityStore.use.anonymousId()
   const externalDeviceSessionId = useSessionContextIdentityStore.use.externalDeviceSessionId()
   const externalUserId = useSessionContextIdentityStore.use.externalUserId()
-  const currentInitStage = useAppInitStore.use.currentStage()
+  const currentInitStage = useAppInitStore.use.current()
 
   const setAppSessionId = useSessionContextIdentityStore(state => state.setAppSessionId)
 
   useEffect(() => {
-    if (currentInitStage === AppInitStage.APP_CAME_TO_FOREGROUND) {
+    if (currentInitStage === AppInitStage.SESSION_SPAWNED) {
       setAppSessionId()
     }
-  }, [currentInitStage])
+  }, [currentInitStage, setAppSessionId])
 
   return {
     appSessionId,

@@ -3,18 +3,21 @@ import globals from 'globals'
 import tseslint from 'typescript-eslint'
 import stylistic from '@stylistic/eslint-plugin'
 import pluginReact from 'eslint-plugin-react'
+import reactHooks from 'eslint-plugin-react-hooks'
+
 import { defineConfig } from 'eslint/config'
 
 export default defineConfig([
   {
     files: ['**/*.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
-    plugins: { js, '@stylistic': stylistic },
+    plugins: { js, '@stylistic': stylistic, 'react-hooks': reactHooks },
     extends: ['js/recommended'],
     languageOptions: {
       globals: globals.browser,
     },
     rules: {
       '@stylistic/indent': ['error', 2],
+      'react-hooks/exhaustive-deps': 'warn',
     },
   },
   { files: ['**/*.js'], languageOptions: { sourceType: 'commonjs' } },

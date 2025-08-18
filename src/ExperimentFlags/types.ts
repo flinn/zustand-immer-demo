@@ -16,9 +16,8 @@ export interface ExperimentFlag extends IFlag {
 export type ExperimentFlags = Record<string, ExperimentFlag>
 
 export type ExperimentFlagState = {
-  realtimeUpdatedAt: number | null
-  sessionSyncedUpdatedAt: number | null
-  appInitUpdatedAt: number | null
+  isSessionSyncComplete: boolean  
+  isAppInitComplete: boolean
   cache: Record<string, ExperimentFlag>
 }
 
