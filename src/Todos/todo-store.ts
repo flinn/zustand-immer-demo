@@ -1,5 +1,6 @@
 import create from 'zustand'
 import { immer } from 'zustand/middleware/immer'
+import { createSelectors } from '../Utilities/create-selectors'
 
 interface Todo {
   id: string
@@ -15,7 +16,7 @@ type TodoActions = {
   toggleTodo: (todoId: string) => void
 }
 
-export const useTodoStore = create<TodoState & TodoActions>()(
+export const todoStore = create<TodoState & TodoActions>()(
   immer(set => ({
     todos: {
       '82471c5f-4207-4b1d-abcb-b98547e01a3e': {
@@ -45,3 +46,5 @@ export const useTodoStore = create<TodoState & TodoActions>()(
       }),
   })),
 )
+
+export const fromTodoStore = createSelectors(todoStore)

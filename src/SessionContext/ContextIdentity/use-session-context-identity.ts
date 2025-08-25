@@ -1,22 +1,31 @@
 import { AppInitStage } from '../../AppInit/types'
-import { useAppInitStore } from '../../AppInit'
+import { useAppInitStage } from '../../AppInit'
 import { useEffect } from 'react'
-import { SessionIdentityState, useSessionContextIdentityStore } from './store'
+import { SessionIdentityState, sessionContextIdentityStore } from './store'
 
 export const useSessionContextIdentity = (): SessionIdentityState => {
-  const appSessionId = useSessionContextIdentityStore.use.appSessionId()
-  const anonymousId = useSessionContextIdentityStore.use.anonymousId()
-  const externalDeviceSessionId = useSessionContextIdentityStore.use.externalDeviceSessionId()
-  const externalUserId = useSessionContextIdentityStore.use.externalUserId()
-  const currentInitStage = useAppInitStore.use.current()
 
-  const setAppSessionId = useSessionContextIdentityStore(state => state.setAppSessionId)
+  const { currentStage, isFirstAppLaunch } = useAppInitStage()
+  
+  const appSessionId = sessionContextIdentityStore.use.appSessionId()
+  const anonymousId = sessionContextIdentityStore.use.anonymousId()
+  const externalDeviceSessionId = sessionContextIdentityStore.use.externalDeviceSessionId()
+  const externalUserId = sessionContextIdentityStore.use.externalUserId()
+  
+
+  const setAppSessionId = sessionContextIdentityStore(state => state.setAppSessionId)
+  const setAnonymousId = sessionContextIdentityStore(state => state.setAnonymousId)
+  const setExternalDeviceSessionId = sessionContextIdentityStore(state => state.setExternalDeviceSessionId)
 
   useEffect(() => {
-    if (currentInitStage === AppInitStage.SESSION_SPAWNED) {
+    if (currentStage === AppInitStage.SESSION_SPAWNED) {
       setAppSessionId()
+      if (isFirstAppLaunch) {
+        setAnonymousId()
+        setExternalDeviceSessionId()
+      }
     }
-  }, [currentInitStage, setAppSessionId])
+  }, [currentStage, setAppSessionId, isFirstAppLaunch, setAnonymousId, setExternalDeviceSessionId])
 
   return {
     appSessionId,

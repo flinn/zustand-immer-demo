@@ -1,38 +1,61 @@
-import { useCallback, useEffect } from 'react'
-import { AppInitStageProgression, SessionStartupType, useAppInitStore, useTrackAppInitStage } from './AppInit'
-//import { v4 as uuid } from 'uuid'
-import { useTodoStore } from './Todos/todo-store'
+import { useCallback, useEffect, useState, ReactElement } from 'react'
+import { useAppInitStage, AppInitStageProgression, SessionStartupType, useTrackAppInitStage } from './AppInit'
+import { fromTodoStore } from './Todos/todo-store'
 import { useSessionContextIdentity } from './SessionContext'
+import { getUserList } from './ApiClient'
+import { sessionContextIdentityStore } from './SessionContext/ContextIdentity/store'
+import { ulid } from 'ulid'
+import { appInitStore } from './AppInit/store'
 
-export default function App() {
-  const todos = useTodoStore(state => state.todos)
-  const toggleTodo = useTodoStore(state => state.toggleTodo)
+import {
+  Container,
+  Row,
+  Col,
+  Card,
+  Button,
+  ProgressBar,
+  Badge,
+  Alert,
+  Spinner,
+  Form,
+  Image,
+} from 'react-bootstrap'
 
-  const isFirstAppLaunch = useAppInitStore.use.isFirsttimeAppLaunch()
-  const startType = useAppInitStore.use.sessionStartupType()
-  const initStage = useAppInitStore.use.current()
-  const { appSessionId } = useSessionContextIdentity();
+export const App = (): ReactElement<any, any> => {
+  const todos = fromTodoStore.use.todos()
+  const toggleTodo = fromTodoStore(state => state.toggleTodo)
 
-  //const [appSessionId, setAppSessionId] = useState<null | string>()
+  const { startType, isFirstAppLaunch, currentStage: initStage } = useAppInitStage()
+  const { appSessionId, externalDeviceSessionId, externalUserId, anonymousId } = useSessionContextIdentity()
+
+  // Users state
+  const [users, setUsers] = useState<any[]>([])
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false)
+  const [localStorageInfo, setLocalStorageInfo] = useState<{
+     hasData: boolean;
+     dataSize: number; 
+     lastStartupTimestamp?: string
+  }>({ hasData: false, dataSize: 0, lastStartupTimestamp: 'n/a' })
 
   const { setSessionStartupType, setIsFirstAppLaunch } = useTrackAppInitStage({
     isFirstAppLaunch,
     startType,
   })
 
-  useEffect(() => {
-    console.log(`First time render of App.tsx -- [isFirstAppLaunch=${isFirstAppLaunch}|initStage=${initStage}|startType=${startType}|appSessionId=${appSessionId}]`)
-
-    //setAppSessionId(uuid())
-    // eslint-disable-next-line
+  const fetchUsers = useCallback(async () => {
+    setIsLoadingUsers(true)
+    try {
+      const userList = await getUserList()
+      setUsers(userList)
+      console.log('Fetched users:', userList)
+    }
+    catch (error) {
+      console.error('Error fetching users:', error)
+    }
+    finally {
+      setIsLoadingUsers(false)
+    }
   }, [])
-
-  const completedTodos = Object.values(todos).filter(todo => todo.done).length
-  const totalTodos = Object.values(todos).length
-  const progressPercentage = totalTodos > 0 ? (completedTodos / totalTodos) * 100 : 0
-
-  const appInitProgressPercentage = AppInitStageProgression[initStage].percent;
-  const appInitProgressDescription = AppInitStageProgression[initStage].description;
 
   const toggleSessionStartupType = useCallback(() => {
     console.log('toggleSessionStartupType', startType)
@@ -44,160 +67,417 @@ export default function App() {
     setIsFirstAppLaunch(!isFirstAppLaunch)
   }, [isFirstAppLaunch, setIsFirstAppLaunch])
 
+  const setExternalUserId = useCallback(() => {
+    const newUserId = ulid().slice(0, 10);
+    sessionContextIdentityStore.getState().setExternalUserId(newUserId)
+    console.log('----> Setting externalUserId to be:', newUserId)
+  }, [])
+
+  const clearLocalStorage = useCallback(() => {
+    appInitStore.getState().clearLocalStorage()
+    // Refresh localStorage info
+    setLocalStorageInfo(appInitStore.getState().getLocalStorageInfo())
+    // Force a page reload to reset the state
+    window.location.reload()
+  }, [])
+
+  const refreshLocalStorageInfo = useCallback(() => {
+    setLocalStorageInfo(appInitStore.getState().getLocalStorageInfo())
+  }, [])
+
+  useEffect(() => {
+    console.log(`Render App.tsx [isFirstAppLaunch=${isFirstAppLaunch}|initStage=${initStage}|startType=${startType}|appSessionId=${appSessionId}]`)
+    // Initialize first launch detection
+    const lastStartTs = appInitStore.getState().lastStartupTimestamp;
+    if (!lastStartTs) {
+      appInitStore.getState().initializeFirstLaunch()
+    }
+    // Get localStorage info
+    setLocalStorageInfo(appInitStore.getState().getLocalStorageInfo())
+    // eslint-disable-next-line
+  }, [])
+
+  useEffect(() => {
+    fetchUsers()
+  }, [fetchUsers])
+
+  const completedTodos = Object.values(todos).filter(todo => todo.done).length
+  const totalTodos = Object.values(todos).length
+  const progressPercentage = totalTodos > 0 ? (completedTodos / totalTodos) * 100 : 0
+
+  const appInitProgressPercentage = AppInitStageProgression[initStage].percent
+  const appInitProgressDescription = AppInitStageProgression[initStage].description
+
   return (
-    <div className="container-fluid py-4 row-gap-3">
-      {/* Header Section */}
-      <div className="row mb-4">
-        <div className="col-12 text-center mb-3">
-          <h1 className="display-4 fw-bold text-primary mb-2">Zustand + Immer Demo</h1>
-          <p className="lead text-muted">Application Initialization & State Management Dashboard</p>
-          <img alt="Dave Logo" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iODdweCIgaGVpZ2h0PSIyMnB4IiB2aWV3Qm94PSIwIDAgODcgMjIiIHZlcnNpb249IjEuMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayI+CiAgICA8IS0tIEdlbmVyYXRvcjogU2tldGNoIDU0LjEgKDc2NDkwKSAtIGh0dHBzOi8vc2tldGNoYXBwLmNvbSAtLT4KICAgIDx0aXRsZT5kYXZlLWxvZ288L3RpdGxlPgogICAgPGRlc2M+Q3JlYXRlZCB3aXRoIFNrZXRjaC48L2Rlc2M+CiAgICA8ZyBpZD0iU3ltYm9scyIgc3Ryb2tlPSJub25lIiBzdHJva2Utd2lkdGg9IjEiIGZpbGw9Im5vbmUiIGZpbGwtcnVsZT0iZXZlbm9kZCI+CiAgICAgICAgPGcgaWQ9ImhlYWRlci9ob21lIiB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtNTAuMDAwMDAwLCAtMjkuMDAwMDAwKSIgZmlsbD0iIzAwODczMiI+CiAgICAgICAgICAgIDxnIGlkPSJoZWFkZXIiPgogICAgICAgICAgICAgICAgPGcgaWQ9ImJyYW5kaW5nL2xvZ28vZ3JlZW4iIHRyYW5zZm9ybT0idHJhbnNsYXRlKDUwLjAwMDAwMCwgMjkuMDAwMDAwKSI+CiAgICAgICAgICAgICAgICAgICAgPGcgaWQ9ImFsbCI+CiAgICAgICAgICAgICAgICAgICAgICAgIDxwYXRoIGQ9Ik0zNC45MzcyMDE5LDEzLjUxNzM3MSBMMzQuOTM3MjAxOSwxMi45MTI3ODE5IEMzMS4yMDg3NjgzLDExLjgzNTMzMDkgMjguMTQ4MDYxMSwxMi4yMTMwMDc2IDI4LjE2MTc2OTQsMTUuMDE0NzMwMyBDMjguMTc3Njg4NywxOC4yNTUxNzk1IDM0LjkzNzIwMTksMTcuOTk4MDcwNCAzNC45MzcyMDE5LDEzLjUxNzM3MSBaIE02OS43Njc4MTI2LDEzLjI0OTQ1MyBDNzAuMDY2ODk5MSwxNS4zOTY3MTc3IDcyLjQ2NzUzNjYsMTYuNjk2OTM2NSA3NC4zMDExMjQsMTYuNjk2OTM2NSBDNzUuOTczMzU5MiwxNi42OTY5MzY1IDc3LjAyODg4MDQsMTYuMzgzMzY5OCA3OC4xMjg1NDcyLDE1LjU5NzU5MyBDNzkuMDQzNDY0NywxNC45NDM3NjM3IDgwLjI3MDkzMzEsMTQuOTE4ODE4NCA4MS4xOTYwMDQsMTUuNTU4NjQzMyBDODIuNzE3NDgyLDE2LjYxMDk0MDkgODIuNzAwMjY1MywxOC44NTcxMTE2IDgxLjE1MzE4MjgsMTkuODcyMjEwMSBDNzkuNDU5MDk1NSwyMC45ODQwMjYzIDc2Ljk5Njg3NDksMjIgNzMuNjU0ODMyNCwyMiBDNjcuODkxNDA0LDIyIDYzLjIwNTEyODIsMTcuMDY0NzcwMiA2My4yMDUxMjgyLDEwLjk5NzU5MyBDNjMuMjA1MTI4Miw0LjkzMjgyMjc2IDY3Ljg5MTQwNCw4Ljg4MTc4NDJlLTE2IDczLjY1NDgzMjQsOC44ODE3ODQyZS0xNiBDNzguODE3NDM5Myw4Ljg4MTc4NDJlLTE2IDgzLjI2NDQ0Niw0LjA1MDEwOTQxIDgzLjk5NzA0MjIsOS40MjIxMDA2NiBDODQuMDA0MTA1NSw5LjQ3NjgwNTI1IDg0LjAxMTE2ODgsOS41NTI1MTY0MSA4NC4wMTgyMzIsOS42NDA0ODE0IEM4NC4wODA2OTgxLDEwLjU5Mjc3OSA4My43NDY1MTU5LDExLjUwMjYyNTggODMuMDc4MzcyMywxMi4xOTc1OTMgQzgyLjQwODI0MjEsMTIuODk0MzEwNyA4MS40NTIyNjkyLDEzLjI0OTQ1MyA4MC40ODA4NDU0LDEzLjI0OTQ1MyBMNjkuNzY3ODEyNiwxMy4yNDk0NTMgWiBNNzcuNTk2ODEzNSw5LjE1NjQ1NTE0IEM3Ny41OTY4MTM1LDguMzA0NTk1MTkgNzYuOTc5NDM3NCw1LjE0ODc5NjUgNzMuNTU2NjA4NSw1LjE0ODc5NjUgQzcxLjU0Mzc5LDUuMTQ4Nzk2NSA2OS43NjI5NTY2LDcuMDM3NDE3OTQgNjkuNzYyOTU2Niw5LjE1NjQ1NTE0IEw3Ny41OTY4MTM1LDkuMTU2NDU1MTQgWiBNMzEuODg5MDk3NSw4Ljg4MTc4NDJlLTE2IEMzNC40NzUzMjEsOC44ODE3ODQyZS0xNiAzNi43Mjg1NjU3LDAuNjgwNTE4Mzk1IDM4LjU4NjI2LDIuMDIyOTU1ODEgQzQxLjcwMTgwMDMsNC4yNzM2OTkyOSA0MS42NTUzNjksNy43ODkyMDA0MyA0MS42Mzc5MDIsOS4xMTI2MDA4MyBDNDEuNjM2Nzk2NSw5LjE5NDY1NjkxIDQxLjYzNTY5MSw5LjI2ODE3OTE1IDQxLjYzNTY5MSw5LjMzMTQxNzAzIEw0MS42MzU2OTEsMTguNTc2NDAxNyBDNDEuNjM1NjkxLDIwLjM2NzE5MzUgNDAuMTYzNTk3NiwyMS44MjQwNzE4IDM4LjM1NDEwMzUsMjEuODI0MDcxOCBMMzguMjM0NzA4NywyMS44MjQwNzE4IEMzNy4zNTg3MDQ4LDIxLjgyNDA3MTggMzYuNTM0ODgwOSwyMS40ODYyMTk2IDM1LjkxNDY5MTMsMjAuODcyNDQwMSBDMzUuNTgxNzEyNiwyMC41NDMxMjE3IDM1LjMyODc3MjUsMjAuMTUyNTM0OCAzNS4xNjYyNjMsMTkuNzI2MDYyIEMzNC4yMzU0MjU5LDIwLjYwNzY3MjUgMzIuMzU3NjExNCwyMiAyOS4wODI2NTY5LDIyIEMyNC41MTUzNjQ1LDIyIDIxLjU2NDEwMjYsMTkuMjQyMDQwNiAyMS41NjQxMDI2LDE0Ljk3NDI0OTMgQzIxLjU2NDEwMjYsMTEuNDA0NDgxOCAyNC40OTcyMzQyLDguODI0NjM4NyAyOS4wMzY0NDY3LDguNDAxNjY2OTggQzMxLjYzMTUxNDMsOC4xNjA1MzE1MiAzMy44NzkwMTA0LDguNjU1OTMxNDEgMzQuOTUzMzQyMyw4Ljk1OTQyOTQ5IEwzNC45NTMxMjEyLDguNzEwODU0MjggQzM0Ljk1MzEyMTIsNC45MjU5OTAzOSAzMC40Mzg4OTMxLDUuMzYyMDkxMDkgMjcuMDM3Njg5Nyw2LjE0MDQyMDMzIEMyMy4wODI2MjcyLDcuMDQ4NzI2MzkgMjEuODk2MTk2OSwyLjAyNjQ1Njg3IDI1LjI4OTg4MjksMC45Nzc4ODk2MTcgQzI2Ljc2MzA4MTcsMC41MjI3NTE5MTIgMjguODQ0NzUxOCw4Ljg4MTc4NDJlLTE2IDMxLjg4OTA5NzUsOC44ODE3ODQyZS0xNiBaIE0zLjM4Mzc2NjEyLDguODgxNzg0MmUtMTYgTDkuNjgwMTgwOTMsOC44ODE3ODQyZS0xNiBDMTUuNzIzMDM4Myw4Ljg4MTc4NDJlLTE2IDIwLjcxOTk0MjksNC42ODg0ODIwNSAyMC44MTg5MzYsMTAuNDUxODU3OCBDMjAuODY4NDMyNiwxMy4zMjc3NjU1IDE5Ljc1MTE1OTgsMTYuMDQwMDgzNCAxNy42NzMyMDM1LDE4LjA4ODg4MTQgQzE1LjU5NDM0NzIsMjAuMTM4MTE1NiAxMi44MTY5MTQxLDIxLjI2NjY2NjcgOS44NTI1MTkwMiwyMS4yNjY2NjY3IEwzLjM4Mzc2NjEyLDIxLjI2NjY2NjcgQzEuNTE3OTcwMDgsMjEuMjY2NjY2NyAwLDE5Ljc5NTIzMTUgMCwxNy45ODYxNDcgTDAsMy4yODA1MTk2NiBDMCwxLjQ3MTQzNTIxIDEuNTE3OTcwMDgsOC44ODE3ODQyZS0xNiAzLjM4Mzc2NjEyLDguODgxNzg0MmUtMTYgWiBNNi41OTIwNDQzNywxNi4zMDMzNTM4IEw4LjM4NDQ5NTQ4LDE2LjMwMzM1MzggQzEyLjIxMDEzMTEsMTYuMzAzMzUzOCAxNC4yMjg2OTE1LDEzLjc2NDY1OTEgMTQuMjI4NjkxNSwxMC42MzMzMzMzIEMxNC4yMjg2OTE1LDcuNTAxNzg5NCAxMi4yNDc0Nzg1LDQuOTYzNTMwOTQgOC4zODQ0OTU0OCw0Ljk2MzUzMDk0IEw2LjU5MjA0NDM3LDQuOTYzNTMwOTQgTDYuNTkyMDQ0MzcsMTYuMzAzMzUzOCBaIE01Mi43OTQ5MjYsMTMuMjUyNjAzNCBMNTYuNzk1NjkxMiwyLjE3ODc1Mjk1IEM1Ny4yNjgxMjA5LDAuODcxMzI2MTI2IDU4LjUwOTYxNjksOC44ODE3ODQyZS0xNiA1OS45MDA0MTY0LDguODgxNzg0MmUtMTYgQzYyLjMwODc1NjcsOC44ODE3ODQyZS0xNiA2My45MDYyMTY4LDIuNDk0NzIzNTUgNjIuODk4MDg5Nyw0LjY4MDkxNjI0IEw1NS43OTQ1Njk1LDIwLjA4MDc2MzEgQzU1LjI1NDkzMTQsMjEuMjUwNTU0NSA1NC4wODM3MDg3LDIyIDUyLjc5NDkyNiwyMiBDNTEuNTA1OTI0MywyMiA1MC4zMzQ3MDE2LDIxLjI1MDU1NDUgNDkuNzk1MDYzNSwyMC4wODA3NjMxIEw0Mi42OTE3NjIzLDQuNjgwOTE2MjQgQzQxLjY4MzQxNjIsMi40OTQ3MjM1NSA0My4yODA4NzYzLDguODgxNzg0MmUtMTYgNDUuNjg5NDM1NSw4Ljg4MTc4NDJlLTE2IEM0Ny4wODAwMTYxLDguODgxNzg0MmUtMTYgNDguMzIxNTEyMiwwLjg3MTMyNjEyNiA0OC43OTM5NDE4LDIuMTc4NzUyOTUgTDUyLjc5NDkyNiwxMy4yNTI2MDM0IFogTTg3LDIuMTk5OTk5OTcgQzg3LDIuODE3OTc3NDggODYuNzg2OTQ5MSwzLjMzNzA3ODYxIDg2LjM1NDU4MDcsMy43NjM0ODMwOSBDODUuOTIyMjEyNyw0LjE4OTg4NzU4IDg1LjM4OTU4NTEsNC4zOTk5OTk5NCA4NC43NjkyMzA4LDQuMzk5OTk5OTQgQzg0LjE0MjYxMDMsNC4zOTk5OTk5NCA4My42MTYyNDg4LDQuMTg5ODg3NTggODMuMTgzODgwOCwzLjc2MzQ4MzA5IEM4Mi43NTE1MTI1LDMuMzM3MDc4NjEgODIuNTM4NDYxNSwyLjgxNzk3NzQ4IDgyLjUzODQ2MTUsMi4xOTk5OTk5NyBDODIuNTM4NDYxNSwxLjU4MjAyMjQ1IDgyLjc1MTUxMjUsMS4wNjI5MjEzMyA4My4xODM4ODA4LDAuNjM2NTE2ODQ1IEM4My42MTYyNDg4LDAuMjEwMTEyMzU2IDg0LjE0MjYxMDMsLTUuMzI5MDcwNTJlLTE1IDg0Ljc2OTIzMDgsLTUuMzI5MDcwNTJlLTE1IEM4NS4zODk1ODUxLC01LjMyOTA3MDUyZS0xNSA4NS45MjIyMTI3LDAuMjEwMTEyMzU2IDg2LjM1NDU4MDcsMC42MzY1MTY4NDUgQzg2Ljc4Njk0OTEsMS4wNjI5MjEzMyA4NywxLjU4MjAyMjQ1IDg3LDIuMTk5OTk5OTcgWiBNODYuNzA1NDg4MywyLjE5OTk5OTk3IEM4Ni43MDU0ODgzLDEuNjc0NzE5MDggODYuNTE3NTAyLDEuMjIzNTk1NDkgODYuMTM1MjYzNiwwLjg1MjgwODk3NSBDODUuNzU5MjkxMSwwLjQ3NTg0MjY4OCA4NS4zMDE4NTgxLDAuMjkwNDQ5NDM0IDg0Ljc2OTIzMDgsMC4yOTA0NDk0MzQgQzg0LjIzNjYwMzEsMC4yOTA0NDk0MzQgODMuNzc5MTcwMSwwLjQ3NTg0MjY4OCA4My40MDMxOTc5LDAuODUyODA4OTc1IEM4My4wMjA5NTkyLDEuMjIzNTk1NDkgODIuODMyOTczMywxLjY3NDcxOTA4IDgyLjgzMjk3MzMsMi4xOTk5OTk5NyBDODIuODMyOTczMywyLjcyNTI4MDg1IDgzLjAyMDk1OTIsMy4xNzY0MDQ0NiA4My40MDMxOTc5LDMuNTQ3MTkwOTcgQzgzLjc3OTE3MDEsMy45MjQxNTcyNSA4NC4yMzY2MDMxLDQuMTA5NTUwNSA4NC43NjkyMzA4LDQuMTA5NTUwNSBDODUuMzAxODU4MSw0LjEwOTU1MDUgODUuNzU5MjkxMSwzLjkyNDE1NzI1IDg2LjE0MTUyOTgsMy41NDcxOTA5NyBDODYuNTE3NTAyLDMuMTc2NDA0NDYgODYuNzA1NDg4MywyLjcyNTI4MDg1IDg2LjcwNTQ4ODMsMi4xOTk5OTk5NyBaIE04NS4wODI1NDEsMi4zNzMwMzM2NyBMODUuNzc4MDg5OSwzLjQ3MzAzMzY2IEw4NS4yOTU1OTE5LDMuNDczMDMzNjYgTDg0LjY3NTIzNzYsMi40MTYyOTIxIEw4NC4zNTU2NjEyLDIuNDE2MjkyMSBMODQuMzU1NjYxMiwzLjQ3MzAzMzY2IEw4My45NTQ2MjQsMy40NzMwMzM2NiBMODMuOTU0NjI0LDAuOTI2OTY2Mjc3IEw4NC44NDQ0MjUxLDAuOTMzMTQ2MDUxIEM4NS4wNzAwMDg3LDAuOTMzMTQ2MDUxIDg1LjI1Nzk5NDksMS4wMDExMjM1OCA4NS40MTQ2NSwxLjEzMDg5ODg2IEM4NS41NzEzMDUyLDEuMjYwNjc0MTQgODUuNjUyNzY1NiwxLjQzOTg4NzYyIDg1LjY1Mjc2NTYsMS42Njg1MzkzIEM4NS42NTI3NjU2LDEuODg0ODMxNDMgODUuNTk2MzY5OCwyLjA0NTUwNTU4IDg1LjQ3NzMxMiwyLjE1Njc0MTU0IEM4NS4zNjQ1MjA0LDIuMjY3OTc3NDkgODUuMjMyOTI5OSwyLjM0MjEzNDc5IDg1LjA4MjU0MSwyLjM3MzAzMzY3IFogTTg1LjIzOTE5NjEsMS42NzQ3MTkwOCBDODUuMjM5MTk2MSwxLjM5NjYyOTE5IDg1LjA1NzQ3NjMsMS4yNjA2NzQxNCA4NC43MDAzMDI2LDEuMjYwNjc0MTQgTDg0LjM1NTY2MTIsMS4yNjA2NzQxNCBMODQuMzU1NjYxMiwyLjA4ODc2NDAxIEw4NC43MDAzMDI2LDIuMDg4NzY0MDEgQzg1LjA1NzQ3NjMsMi4wODg3NjQwMSA4NS4yMzkxOTYxLDEuOTUyODA4OTYgODUuMjM5MTk2MSwxLjY3NDcxOTA4IFoiIGlkPSJjb2xvciIgZmlsbC1ydWxlPSJub256ZXJvIj48L3BhdGg+CiAgICAgICAgICAgICAgICAgICAgPC9nPgogICAgICAgICAgICAgICAgPC9nPgogICAgICAgICAgICA8L2c+CiAgICAgICAgPC9nPgogICAgPC9nPgo8L3N2Zz4=" className="img-fluid" />
-        </div>
-      </div>
+    <>
+      <Container fluid className="py-4">
+        {/* Header Section */}
+        <Row className="mb-4">
+          <Col xs={12} className="text-center mb-3">
+            <h1 className="display-4 fw-bold text-primary mb-2">Zustand + Immer Demo</h1>
+            <p className="lead text-muted">Application Initialization & State Management Dashboard</p>
+          </Col>
+        </Row>
 
-      <div className="row g-4 p-1 mb-2 bg-info-subtle text-white">
-        <div className="col-12 text-center">
-          <p className="h3">{appInitProgressDescription} <em>{`(${appInitProgressPercentage}% Complete)`}</em></p>
-          <div className="progress mb-4 p-1"
-            role="progressbar"
-            aria-label="Animated striped example"
-            aria-valuenow={appInitProgressPercentage}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            style={{ height: 45 }}>
-            <div
-              className="progress-bar progress-bar-striped progress-bar-animated bg-info"
-              style={{ width: `${appInitProgressPercentage}%` }}></div>              
-          </div>
-        </div>
-      </div>
+        <Row className="g-4 p-1 mb-2 bg-info-subtle text-white">
+          <Col xs={12} className="text-center">
+            <p className="h3">
+              {appInitProgressDescription}
+              {' '}
+              <em>{`(${appInitProgressPercentage}% Complete)`}</em>
+            </p>
+            <ProgressBar
+              now={appInitProgressPercentage}
+              className="mb-4 p-1"
+              style={{ height: 45 }}
+              variant="info"
+              animated
+              striped
+            />
+          </Col>
+        </Row>
 
-      <div className="row g-4 p-1">
-        {/* App Init Status Section */}
-        <div className="col-lg-6">
-          <div className="card shadow h-100">
-            <div className="card-header bg-primary text-white">
-              <h3 className="card-title mb-0">
-                <i className="bi bi-lightning-charge me-2"></i>
-                AppInit Process Metadata
-              </h3>
-            </div>
-            <div className="card-body">
-              {/* Control Buttons */}
-              <div className="d-grid gap-2 mb-4">
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-lg"
-                  onClick={() => toggleIsFirstAppLaunch()}
-                >
-                  <i className="bi bi-check-circle me-2"></i>
-                  Set Is First App Launch to False
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-lg"
-                  onClick={() => toggleSessionStartupType()}
-                >
-                  <i className="bi bi-arrow-clockwise me-2"></i>
-                  Set Start Type to Warm Start
-                </button>
-              </div>
-
-              {/* Status Information */}
-              <div className="row g-3">
-                <div className="col-12">
-                  <div className="d-flex justify-content-between align-items-center p-3 bg-light rounded">
-                    <span className="fw-semibold">Current Stage:</span>
-                    <span className="badge bg-info fs-6">{initStage}</span>
-                  </div>
+        <Row className="g-4 p-1">
+          {/* App Init Status Section */}
+          <Col lg={4}>
+            <Card className="shadow">
+              <Card.Header className="bg-primary text-white">
+                <p className="h3 card-title mb-0">
+                  ⚡ AppInit Process Metadata
+                </p>
+              </Card.Header>
+              <Card.Body>
+                {/* Control Buttons */}
+                <div className="d-grid gap-2 mb-4">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => toggleIsFirstAppLaunch()}
+                  >
+                    <i className="bi bi-check-circle me-2"></i>
+                    Toggle IsFirstAppLaunch
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => toggleSessionStartupType()}
+                  >
+                    <i className="bi bi-arrow-clockwise me-2"></i>
+                    Toggle Startup Type
+                  </Button>
+                  <Button
+                    variant="warning"
+                    size="lg"
+                    onClick={() => setExternalUserId()}
+                  >
+                    <i className="bi bi-person-badge me-2"></i>
+                    Set External User ID
+                  </Button>
                 </div>
 
-                <div className="col-12">
-                  <div className="d-flex justify-content-between align-items-center p-3 bg-light rounded">
-                    <span className="fw-semibold">Session Startup Type:</span>
-                    <span className={`badge ${startType === SessionStartupType.WARM_START ? 'bg-warning' : 'bg-primary'} fs-6`}>{startType}</span>
-                  </div>
-                </div>
+                <hr />
 
-                <div className="col-12">
-                  <div className="d-flex justify-content-between align-items-center p-3 bg-light rounded">
-                    <span className="fw-semibold">Is First Time App Launched?</span>
-                    <span className={`badge ${isFirstAppLaunch ? 'bg-success' : 'bg-danger'} fs-6`}>
-                      {isFirstAppLaunch ? 'True' : 'False'}                      
-                    </span>
-                  </div>
-                </div>
+                {/* Status Information */}
+                <Row className="g-3">
+                  <Col xs={12}>
+                    <div className="d-flex justify-content-between align-items-center p-3 bg-light rounded">
+                      <span className="fw-semibold">Current Stage:</span>
+                      <Badge bg="info" className="fs-6">{initStage}</Badge>
+                    </div>
+                  </Col>
 
-              </div>
-            </div>
-          </div>
-        </div>
+                  <Col xs={12}>
+                    <div className="d-flex justify-content-between align-items-center p-3 bg-light rounded">
+                      <span className="fw-semibold">Session Startup Type:</span>
+                      <Badge
+                        bg={startType === SessionStartupType.WARM_START ? 'warning' : 'primary'}
+                        className="fs-6"
+                      >
+                        {startType}
+                      </Badge>
+                    </div>
+                  </Col>
 
-        {/* Todo List Section */}
-        <div className="col-lg-6">
-          <div className="card shadow h-100">
-            <div className="card-header bg-success text-white">
-              <h3 className="card-title mb-0">
-                <i className="bi bi-clipboard-check me-2"></i>
-                Learning Tasks
-              </h3>
-            </div>
-            <div className="card-body">
-              {/* Todo Items */}
-              <div className="mb-4">
-                {Object.values(todos).map(todo => (
-                  <div
-                    key={todo.id}
-                    className={`d-flex align-items-center p-3 mb-2 rounded border ${todo.done
+                  <Col xs={12}>
+                    <div className="d-flex justify-content-between align-items-center p-3 bg-light rounded">
+                      <span className="fw-semibold">Is First Time App Launched?</span>
+                      <Badge
+                        bg={isFirstAppLaunch ? 'success' : 'danger'}
+                        className="fs-6"
+                      >
+                        {isFirstAppLaunch ? 'True' : 'False'}
+                      </Badge>
+                    </div>
+                  </Col>
+                </Row>
+
+                {/* localStorage Persistence Info */}
+                <Alert variant="info" className="mt-3">
+                  <i className="bi bi-database me-2"></i>
+                  <strong>localStorage Persistence:</strong> This state is automatically saved to your browser's localStorage and will persist between sessions.
+                </Alert>
+
+                {/* localStorage Management */}
+                <Card className="mt-3">
+                  <Card.Header className="bg-secondary text-white">
+                    <p className="h6 card-title mb-0">
+                      <i className="bi bi-gear me-2"></i>
+                      localStorage Management
+                    </p>
+                  </Card.Header>
+                  <Card.Body>
+                    <div className="mb-3">
+                      <div className="d-flex justify-content-between align-items-center mb-2">
+                        <span className="fw-semibold">Status:</span>
+                        <Badge bg={localStorageInfo.hasData ? 'success' : 'warning'}>
+                          {localStorageInfo.hasData ? 'Data Stored' : 'No Data'}
+                        </Badge>
+                      </div>
+                      {localStorageInfo.hasData && (
+                        <>
+                          <div className="d-flex justify-content-between align-items-center mb-2">
+                            <span className="fw-semibold">Size:</span>
+                            <span className="text-muted">{localStorageInfo.dataSize} bytes</span>                          
+                          </div>
+                          <div className="d-flex justify-content-between align-items-center mb-2">
+                            <span className="fw-semibold">Last App Launch:</span>
+                            <span className="text-muted">{localStorageInfo.lastStartupTimestamp}</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    
+                    <div className="d-grid gap-2">
+                      <Button
+                        variant="outline-info"
+                        size="sm"
+                        onClick={refreshLocalStorageInfo}
+                      >
+                        <i className="bi bi-arrow-clockwise me-2"></i>
+                        Refresh Info
+                      </Button>
+                      <Button
+                        variant="outline-danger"
+                        size="sm"
+                        onClick={clearLocalStorage}
+                      >
+                        <i className="bi bi-trash me-2"></i>
+                        Clear localStorage & Reset
+                      </Button>
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Card.Body>
+            </Card>
+
+            <Card>
+              <Card.Header className="bg-primary text-white">
+                <p className="h3 card-title mb-0">
+                  🥸 Session Identity Details
+                </p>
+              </Card.Header>
+              <Card.Body>
+              <Row className="g-3">
+                  <Col xs={12}>
+                    <div className="d-flex justify-content-between align-items-center p-3 bg-light rounded">
+                      <span className="fw-semibold">App Session ID:</span>
+                      <Badge bg="info" className="fs-6">
+                        {appSessionId}
+                      </Badge>
+                    </div>
+                  </Col>
+
+                  <Col xs={12}>
+                    <div className="d-flex justify-content-between align-items-center p-3 bg-light rounded">
+                      <span className="fw-semibold">Anonymous ID:</span>
+                      <Badge bg="info" className="fs-6">
+                        {anonymousId}
+                      </Badge>
+                    </div>
+                  </Col>
+
+                  <Col xs={12}>
+                    <div className="d-flex justify-content-between align-items-center p-3 bg-light rounded">
+                      <span className="fw-semibold">External Device Session ID:</span>
+                      <Badge bg="info" className="fs-6">
+                        {externalDeviceSessionId}
+                      </Badge>
+                    </div>
+                  </Col>
+
+                  {/* External User ID Status */}
+                  <Col xs={12}>
+                    <div className={`d-flex justify-content-between align-items-center p-3 rounded ${externalUserId ? 'bg-success bg-opacity-10 border border-success' : 'bg-light'}`}>
+                      <span className="fw-semibold">External User ID:</span>
+                      <Badge
+                        bg={externalUserId ? 'success' : 'info'}
+                        className="fs-6"
+                      >
+                        {externalUserId || 'Not Set'}
+                      </Badge>
+                    </div>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>            
+          </Col>
+
+          {/* Todo List Section */}
+          <Col lg={4}>
+            <Card className="shadow h-100">
+              <Card.Header className="bg-success text-white">
+                <p className="h3 card-title mb-0">
+                  <i className="bi bi-clipboard-check me-2"></i>
+                  ✅ Learning Tasks
+                </p>
+              </Card.Header>
+              <Card.Body>
+                {/* Todo Items */}
+                <div className="mb-4">
+                  {Object.values(todos).map(todo => (
+                    <div
+                      key={todo.id}
+                      className={`d-flex align-items-center p-3 mb-2 rounded border ${todo.done
                         ? 'bg-success bg-opacity-10 border-success'
                         : 'bg-light border-light'
                       }`}
-                  >
-                    <div className="form-check me-3">
-                      <input
-                        type="checkbox"
-                        className="form-check-input"
+                    >
+                      <Form.Check
+                        className="me-3"
+                        type="switch"
                         checked={todo.done}
                         onChange={() => toggleTodo(todo.id)}
                         style={{ width: '1.2rem', height: '1.2rem' }}
                       />
+                      <span className={`fs-5 ${todo.done ? 'text-success text-decoration-line-through' : 'text-dark'}`}>
+                        {todo.title}
+                      </span>
                     </div>
-                    <span className={`fs-5 ${todo.done ? 'text-success text-decoration-line-through' : 'text-dark'}`}>
-                      {todo.title}
+                  ))}
+                </div>
+
+                {/* Progress Summary */}
+                <div className="bg-primary bg-opacity-10 p-3 rounded">
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <span className="fw-semibold text-white">Task Progress</span>
+                    <span className="fw-semibold text-white">
+                      {completedTodos}
+                      {' '}
+                      /
+                      {totalTodos}
                     </span>
                   </div>
-                ))}
-              </div>
-
-              {/* Progress Summary */}
-              <div className="bg-primary bg-opacity-10 p-3 rounded">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                  <span className="fw-semibold text-white">Task Progress</span>
-                  <span className="fw-semibold text-white">
-                    {completedTodos}
-                    {' '}
-                    /
-                    {totalTodos}
-                  </span>
+                  <ProgressBar
+                    now={progressPercentage}
+                    variant="primary"
+                    style={{ height: '1.5rem' }}
+                    label={`${Math.round(progressPercentage)}%`}
+                  />
                 </div>
-                <div className="progress" style={{ height: '1.5rem' }}>
-                  <div
-                    className="progress-bar bg-primary"
-                    role="progressbar"
-                    style={{ width: `${progressPercentage}%` }}
-                    aria-valuenow={progressPercentage}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
+              </Card.Body>
+            </Card>
+          </Col>
+
+          {/* Users Section */}
+          <Col lg={4}>
+            <Card className="shadow h-100">
+              <Card.Header className="bg-info text-white">
+                <p className="h3 card-title mb-0">
+                  <i className="bi bi-people me-2"></i>
+                  🛜 Fetched Users
+                </p>
+              </Card.Header>
+              <Card.Body>
+                {/* Control Button */}
+                <div className="d-grid gap-2 mb-4">
+                  <Button
+                    variant="info"
+                    size="lg"
+                    onClick={() => fetchUsers()}
+                    disabled={isLoadingUsers}
                   >
-                    {Math.round(progressPercentage)}
-                    %
+                    <i className="bi bi-arrow-clockwise me-2"></i>
+                    {isLoadingUsers ? 'Loading...' : 'Refresh Users'}
+                  </Button>
+                </div>
+
+                <hr />
+
+                {/* External User ID Info */}
+                {externalUserId && (
+                  <Alert variant="success" className="mb-3">
+                    <i className="bi bi-check-circle me-2"></i>
+                    <strong>External User ID Set!</strong>
+                    {' '}
+                    The Zustand subscription has triggered and axios interceptors will now include the
+                    <code>X-External-User-Id</code>
+                    {' '}
+                    header in all requests.
+                  </Alert>
+                )}
+
+                {/* Users Display */}
+                <div className="mb-4">
+                  {isLoadingUsers
+                    ? (
+                        <div className="text-center p-4">
+                          <Spinner animation="border" variant="info" role="status">
+                            <span className="visually-hidden">Loading...</span>
+                          </Spinner>
+                          <p className="mt-2 text-muted">Fetching users...</p>
+                        </div>
+                      )
+                    : users.length > 0
+                      ? (
+                          users.map((user, index) => (
+                            <div
+                              key={user.userId || index}
+                              className="d-flex align-items-center p-3 mb-2 rounded border bg-light"
+                            >
+                              <div className="me-3">
+                                <Image
+                                  src={user.avatar}
+                                  alt={`${user.username} avatar`}
+                                  roundedCircle
+                                  style={{ width: '3rem', height: '3rem' }}
+                                />
+                              </div>
+                              <div className="flex-grow-1">
+                                <h6 className="mb-1 fw-bold">{user.username}</h6>
+                                <p className="mb-1 text-muted small">{user.email}</p>
+                                <p className="mb-0 text-muted small">
+                                  Registered:
+                                  {' '}
+                                  {new Date(user.registeredAt).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                          ))
+                        )
+                      : (
+                          <div className="text-center p-4 text-muted">
+                            <i className="bi bi-people fs-1 mb-3"></i>
+                            <p>No users loaded. Click "Refresh Users" to fetch data.</p>
+                          </div>
+                        )}
+                </div>
+
+                {/* Users Summary */}
+                <div className="bg-info bg-opacity-10 p-3 rounded">
+                  <div className="d-flex justify-content-between align-items-center">
+                    <span className="fw-semibold text-info">Total Users</span>
+                    <Badge bg="info" className="fs-6">
+                      {users.length}
+                    </Badge>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      </Container>
+    </>
   )
 }
+
+export default App

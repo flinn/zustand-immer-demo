@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useAppInitStore } from './store'
+import { appInitStore } from './store'
 import { SessionStartupType, AppInitStage } from './types'
 
 export type TrackAppInitStageProps = {
@@ -11,12 +11,11 @@ export const useTrackAppInitStage = ({
   isFirstAppLaunch,
   startType,
 }: TrackAppInitStageProps) => {
-  
-  const currentStage = useAppInitStore.use.current()
+  const currentStage = appInitStore.use.currentStage()
 
-  const startAppInit = useAppInitStore(state => state.startAppInit)
-  const setStartType = useAppInitStore(state => state.setSessionStartupType)
-  const setIsFirstAppLaunch = useAppInitStore(state => state.setIsFirstAppLaunch)
+  const startAppInit = appInitStore(state => state.startAppInit)
+  const setStartType = appInitStore(state => state.setSessionStartupType)
+  const setIsFirstAppLaunch = appInitStore(state => state.setIsFirstAppLaunch)
 
   useEffect(() => {
     if (currentStage === AppInitStage.PROCESS_STARTED) {

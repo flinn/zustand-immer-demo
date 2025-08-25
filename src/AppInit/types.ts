@@ -1,12 +1,12 @@
 // Enum for AppInit Stages
 export enum AppInitStage {
   PROCESS_STARTED = 'PROCESS_STARTED',
-  SESSION_SPAWNED = 'SESSION_SPAWNED',  
+  SESSION_SPAWNED = 'SESSION_SPAWNED',
   CONFIGS_LOADED = 'CONFIGS_LOADED',
   CLIENTS_INITIALIZED = 'CLIENTS_INITIALIZED',
   CONTEXTS_IDENTIFIED = 'CONTEXTS_IDENTIFIED',
   USER_INTERFACE_DISPLAYED = 'USER_INTERFACE_DISPLAYED',
-  PROCESS_COMPLETED = 'PROCESS_COMPLETED'
+  PROCESS_COMPLETED = 'PROCESS_COMPLETED',
 }
 
 export enum AppInitVendorActions {
@@ -19,18 +19,18 @@ export enum AppInitVendorActions {
 }
 
 export const AppInitStageProgression: Record<AppInitStage, { description: string, percent: number }> = {
-  'PROCESS_STARTED': { description: 'AppInit Process Started', percent: 0},
-  'SESSION_SPAWNED': { description: 'AppInit Session Spawned', percent: 20},  
-  'CONFIGS_LOADED': { description: 'AppInit Configs Loaded', percent: 30},
-  'CLIENTS_INITIALIZED': { description: 'AppInit Clients Initialized', percent: 50},
-  'CONTEXTS_IDENTIFIED': { description: 'AppInit Contexts Identified', percent: 70}, 
-  'USER_INTERFACE_DISPLAYED': { description: 'AppInit Runtime Vendor Use Enabled', percent: 90},
-  'PROCESS_COMPLETED': { description: 'AppInit Process Completed', percent: 100},
+  PROCESS_STARTED: { description: 'AppInit Process Started', percent: 0 },
+  SESSION_SPAWNED: { description: 'AppInit Session Spawned', percent: 20 },
+  CONFIGS_LOADED: { description: 'AppInit Configs Loaded', percent: 30 },
+  CLIENTS_INITIALIZED: { description: 'AppInit Clients Initialized', percent: 50 },
+  CONTEXTS_IDENTIFIED: { description: 'AppInit Contexts Identified', percent: 70 },
+  USER_INTERFACE_DISPLAYED: { description: 'AppInit Runtime Vendor Use Enabled', percent: 90 },
+  PROCESS_COMPLETED: { description: 'AppInit Process Completed', percent: 100 },
 }
 
-export type VendorInitActionsMap = {  
-  vendorName: string;
-  actions: Partial<Record<AppInitVendorActions, Function>>;
+export type VendorInitActionsMap = {
+  vendorName: string
+  actions: Partial<Record<AppInitVendorActions, Function>>
 }
 
 // Enum for Session Startup Types

@@ -21,7 +21,7 @@ export const useExperimentFlagsStoreBase = create<ExperimentFlagState & Experime
     addFlagsToCache: (flags: ExperimentFlag[]) => {
       set((state) => {
         flags.forEach((flag) => {
-          state.cache[flag.name] = flag          
+          state.cache[flag.name] = flag
         })
       })
     },
